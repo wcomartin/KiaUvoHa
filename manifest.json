@@ -1,0 +1,11 @@
+{
+  "domain": "kia_uvo",
+  "name": "Kia UVO",
+  "documentation": "",
+  "requirements": [
+    "kiauvo==0.1"
+  ],
+  "dependencies": [],
+  "codeowners": [
+  ]
+}
