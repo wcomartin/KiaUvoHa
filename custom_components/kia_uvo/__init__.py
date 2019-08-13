@@ -1,34 +1,32 @@
 """Reads vehicle status from Kia UVO portal."""
 import datetime
 import logging
+import json
 
 import voluptuous as vol
 
-from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
+from homeassistant.const import CONF_NAME, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.helpers import discovery
 from homeassistant.helpers.event import track_utc_time_change
 import homeassistant.helpers.config_validation as cv
+
 
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "kia_uvo"
 CONF_READ_ONLY = "read_only"
-ATTR_VIN = "vin"
 
-ACCOUNT_SCHEMA = vol.Schema(
+CONFIG_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_USERNAME): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
-        vol.Optional(CONF_READ_ONLY, default=False): cv.boolean,
-    }
+        vol.Optional(CONF_NAME): cv.string,
+        vol.Optional(CONF_USERNAME): cv.string,
+        vol.Optional(CONF_PASSWORD): cv.string,
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
-CONFIG_SCHEMA = vol.Schema({DOMAIN: {cv.string: ACCOUNT_SCHEMA}}, extra=vol.ALLOW_EXTRA)
 
-SERVICE_SCHEMA = vol.Schema({vol.Required(ATTR_VIN): cv.string})
-
-
-KIA_COMPONENTS = ["binary_sensor", "device_tracker", "lock", "sensor"]
+KIA_COMPONENTS = ["binary_sensor"]
 UPDATE_INTERVAL = 5  # in minutes
 
 SERVICE_UPDATE_STATE = "update_state"
@@ -39,9 +37,7 @@ _SERVICE_MAP = {
 
 def setup(hass, config: dict):
     """Set up the Kia Uvo components."""
-    accounts = []
-    for name, account_config in config[DOMAIN].items():
-        accounts.append(setup_account(account_config, hass, name))
+    accounts = [setup_account(config[DOMAIN], hass, config[DOMAIN][CONF_NAME])]
 
     hass.data[DOMAIN] = accounts
 
@@ -65,10 +61,9 @@ def setup_account(account_config: dict, hass, name: str) -> "KiaUvoAccount":
     """Set up a new KiaUvoAccount based on the config."""
     username = account_config[CONF_USERNAME]
     password = account_config[CONF_PASSWORD]
-    read_only = account_config[CONF_READ_ONLY]
 
     _LOGGER.debug("Adding new account %s", name)
-    cd_account = KiaUvoAccount(username, password, name, read_only)
+    cd_account = KiaUvoAccount(username, password, name)
 
     # update every UPDATE_INTERVAL minutes, starting now
     # this should even out the load on the servers
@@ -87,12 +82,11 @@ class KiaUvoAccount:
     """Representation of a Kia vehicle."""
 
     def __init__(
-        self, username: str, password: str, name: str, read_only
+        self, username: str, password: str, name: str
     ) -> None:
         """Constructor."""
         from KiaUvo import KiaUvo
 
-        self.read_only = read_only
         self.name = name
         self.account = KiaUvo(username, password)
 
@@ -109,9 +103,10 @@ class KiaUvoAccount:
         )
         try:
             self.account.login()
-            vehicles = self.account.get_vehicle_list()
+            self.account.update_vehicle_states()
             for listener in self._update_listeners:
-                listener(vehicles)
+                print("UPDATE KIA UVO STATES")
+                listener()
         except IOError as exception:
             _LOGGER.error("Error updating the vehicle state")
             _LOGGER.exception(exception)

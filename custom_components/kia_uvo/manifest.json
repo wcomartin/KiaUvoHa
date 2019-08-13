@@ -3,7 +3,7 @@
   "name": "Kia UVO",
   "documentation": "",
   "requirements": [
-    "kiauvo==0.1"
+    "kiauvo==0.5"
   ],
   "dependencies": [],
   "codeowners": [
